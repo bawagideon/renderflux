@@ -10,7 +10,8 @@ app.use(cors());
 app.use(express.json());
 
 // Simple in-memory template storage (Replace with DB in production)
-const templateStore = new Map<string, string>();
+// Simple in-memory template storage (Replace with DB in production)
+// const templateStore = new Map<string, string>();
 
 app.post('/render', async (req: Request, res: Response) => {
     try {
@@ -33,6 +34,8 @@ app.post('/render', async (req: Request, res: Response) => {
     }
 });
 
+import { supabase } from './db';
+
 app.post('/templates', async (req: Request, res: Response) => {
     try {
         const { html, name } = req.body;
@@ -41,11 +44,16 @@ app.post('/templates', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Missing html content' });
         }
 
-        const id = Math.random().toString(36).substring(7);
-        templateStore.set(id, html);
+        const { data, error } = await supabase
+            .from('templates')
+            .insert([{ html, name }])
+            .select()
+            .single();
 
-        console.log(`Stored template ${id}`);
-        res.json({ id, name, message: 'Template stored successfully' });
+        if (error) throw error;
+
+        console.log(`Stored template ${data.id}`);
+        res.json({ id: data.id, name: data.name, message: 'Template stored successfully' });
     } catch (error) {
         console.error('Error storing template:', error);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -70,13 +78,23 @@ app.get('/jobs/:id', async (req: Request, res: Response) => {
     }
 });
 
-app.get('/templates/:id', (req: Request, res: Response) => {
+app.get('/templates/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const html = templateStore.get(id);
-    if (!html) {
-        return res.status(404).json({ error: 'Template not found' });
+    try {
+        const { data, error } = await supabase
+            .from('templates')
+            .select('html')
+            .eq('id', id)
+            .single();
+
+        if (error || !data) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        res.json({ id, html: data.html });
+    } catch (error) {
+        console.error('Error fetching template:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
-    res.json({ id, html });
 });
 
 app.listen(PORT, () => {

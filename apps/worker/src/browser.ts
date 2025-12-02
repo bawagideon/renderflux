@@ -15,6 +15,7 @@ export const getBrowser = async (): Promise<Browser> => {
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--no-zygote', // Extra stability for containerized environments
         ],
     });
 
