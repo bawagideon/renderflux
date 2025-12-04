@@ -1,124 +1,90 @@
-'use client';
+import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 
-import React, { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
-
-export default function Home() {
-    const [html, setHtml] = useState('<h1>Hello RenderFlux</h1>\n<p>Edit me to see live updates!</p>');
-    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-
-    // Debounce render to avoid spamming API
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            handleRender();
-        }, 1000);
-
-        return () => clearTimeout(timer);
-    }, [html]);
-
-    const handleRender = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('http://localhost:3002/render', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html }),
-            });
-            const data = await res.json();
-
-            // For now, we might get a base64 string or a URL
-            // If base64, we can display it using a data URI
-            // If URL, we use that.
-            // The worker currently returns { url: string, pdf: string (base64) }
-            // Let's assume we get a job ID and need to poll, OR for the playground we want instant feedback.
-            // The current API returns { jobId, status: 'queued' }.
-            // We need to poll for the result or update the API to wait (not ideal for queue).
-            // For the playground, let's just simulate the "instant" feel by polling.
-
-            if (data.jobId) {
-                console.log('Job queued:', data.jobId);
-
-                // Poll for result
-                const interval = setInterval(async () => {
-                    try {
-                        const jobRes = await fetch(`http://localhost:3002/jobs/${data.jobId}`);
-                        const jobData = await jobRes.json();
-
-                        if (jobData.state === 'completed' && jobData.result) {
-                            clearInterval(interval);
-                            setLoading(false);
-                            // If result has URL, use it. If base64, construct data URI.
-                            if (jobData.result.url) {
-                                setPdfUrl(jobData.result.url);
-                            } else if (jobData.result.pdf) {
-                                setPdfUrl(`data:application/pdf;base64,${jobData.result.pdf}`);
-                            }
-                        } else if (jobData.state === 'failed') {
-                            clearInterval(interval);
-                            setLoading(false);
-                            console.error('Job failed');
-                        }
-                    } catch (e) {
-                        console.error('Polling error', e);
-                    }
-                }, 1000);
-            } else {
-                setLoading(false);
-            }
-
-        } catch (error) {
-            console.error('Render failed:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+export default function LandingPage() {
     return (
-        <main className="flex h-screen flex-col bg-gray-900 text-white">
-            <header className="flex items-center justify-between border-b border-gray-800 p-4">
-                <h1 className="text-xl font-bold text-blue-400">RenderFlux Playground</h1>
-                <button
-                    onClick={handleRender}
-                    className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-500 disabled:opacity-50"
-                    disabled={loading}
-                >
-                    {loading ? 'Rendering...' : 'Force Render'}
-                </button>
+        <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
+            <header className="container mx-auto flex items-center justify-between py-6 px-4">
+                <div className="flex items-center gap-2 font-bold text-xl text-slate-100">
+                    <div className="h-6 w-6 rounded bg-cyan-500" />
+                    RenderFlux
+                </div>
+                <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+                    <Link href="#" className="hover:text-slate-200">Features</Link>
+                    <Link href="#" className="hover:text-slate-200">Pricing</Link>
+                    <Link href="#" className="hover:text-slate-200">Docs</Link>
+                </nav>
+                <div className="flex items-center gap-4">
+                    <Link href="/login">
+                        <Button variant="ghost" className="text-slate-300 hover:text-white">Login</Button>
+                    </Link>
+                    <Link href="/register">
+                        <Button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">Sign Up</Button>
+                    </Link>
+                </div>
             </header>
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Editor Pane */}
-                <div className="w-1/2 border-r border-gray-800">
-                    <Editor
-                        height="100%"
-                        defaultLanguage="html"
-                        theme="vs-dark"
-                        value={html}
-                        onChange={(value) => setHtml(value || '')}
-                        options={{
-                            minimap: { enabled: false },
-                            fontSize: 14,
-                            padding: { top: 16 },
-                        }}
-                    />
-                </div>
+            <main>
+                <section className="container mx-auto px-4 py-24 text-center lg:py-32">
+                    <h1 className="mx-auto max-w-4xl text-5xl font-extrabold tracking-tight text-slate-100 sm:text-7xl">
+                        The Enterprise <span className="text-cyan-500">PDF Engine</span>
+                    </h1>
+                    <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-400">
+                        Convert HTML/CSS to PDF with pixel-perfect accuracy. Built for developers who need speed, reliability, and scale.
+                    </p>
+                    <div className="mt-10 flex justify-center gap-4">
+                        <Link href="/dashboard">
+                            <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 h-12 px-8 text-base">
+                                Get Started <ArrowRight className="ml-2 h-5 w-5" />
+                            </Button>
+                        </Link>
+                        <Button variant="outline" size="lg" className="h-12 px-8 text-base border-slate-700 text-slate-300 hover:bg-slate-800">
+                            View Documentation
+                        </Button>
+                    </div>
+                </section>
 
-                {/* Preview Pane */}
-                <div className="flex w-1/2 flex-col items-center justify-center bg-gray-800 p-4">
-                    {pdfUrl ? (
-                        <iframe
-                            src={pdfUrl}
-                            className="h-full w-full rounded border border-gray-700 bg-white"
-                            title="PDF Preview"
-                        />
-                    ) : (
-                        <div className="text-gray-500">
-                            {loading ? 'Generating Preview...' : 'Preview will appear here'}
+                <section className="border-t border-slate-900 bg-slate-950/50 py-24">
+                    <div className="container mx-auto px-4">
+                        <div className="grid gap-12 md:grid-cols-3">
+                            <div className="space-y-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500">
+                                    <CheckCircle2 className="h-6 w-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-100">Pixel Perfect</h3>
+                                <p className="text-slate-400">
+                                    Uses the latest Chrome engine to ensure your PDFs look exactly like your HTML.
+                                </p>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
+                                    <CheckCircle2 className="h-6 w-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-100">Lightning Fast</h3>
+                                <p className="text-slate-400">
+                                    Optimized for speed. Generate thousands of documents in seconds with our bulk API.
+                                </p>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
+                                    <CheckCircle2 className="h-6 w-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-100">Developer First</h3>
+                                <p className="text-slate-400">
+                                    Simple REST API, webhooks, and SDKs for your favorite languages.
+                                </p>
+                            </div>
                         </div>
-                    )}
+                    </div>
+                </section>
+            </main>
+
+            <footer className="border-t border-slate-900 py-12">
+                <div className="container mx-auto px-4 text-center text-slate-500">
+                    <p>&copy; 2024 RenderFlux. All rights reserved.</p>
                 </div>
-            </div>
-        </main>
+            </footer>
+        </div>
     );
 }

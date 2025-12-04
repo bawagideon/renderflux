@@ -3,6 +3,7 @@ import { connection } from './redis';
 import { getBrowser } from './browser';
 import Handlebars from 'handlebars';
 import { MockWorker } from 'config';
+import { uploadPdf } from './storage';
 
 const QUEUE_NAME = 'pdf-generation';
 const USE_MOCK_QUEUE = process.env.USE_MOCK_QUEUE === 'true';
@@ -11,14 +12,20 @@ const processJob = async (job: any) => {
     console.log(`Processing job ${job.id}...`);
     const { html, templateId, data } = job.data;
 
-    let content = html;
-    if (templateId) {
-        // Mock template fetching
+    let content = html || '';
+
+    // Simple template merging
+    if (data && content) {
+        try {
+            const template = Handlebars.compile(content);
+            content = template(data);
+        } catch (e) {
+            console.error("Template error:", e);
+        }
     }
 
-    if (data) {
-        const template = Handlebars.compile(content);
-        content = template(data);
+    if (!content) {
+        throw new Error("No HTML content to render");
     }
 
     const browser = await getBrowser();
@@ -34,16 +41,14 @@ const processJob = async (job: any) => {
         const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
 
         const filename = `pdf-${job.id}-${Date.now()}.pdf`;
-        let url = '';
-        try {
-            const { uploadPdf } = await import('./storage');
-            url = await uploadPdf(filename, Buffer.from(pdfBuffer));
-        } catch (e) {
-            console.error("Upload failed, returning base64 as fallback", e);
-        }
+
+        // Upload to R2
+        const url = await uploadPdf(filename, Buffer.from(pdfBuffer));
+        console.log(`Uploaded to: ${url}`);
 
         return {
             url,
+            // Only return base64 if upload failed or wasn't configured, otherwise keep payload light
             pdf: url ? undefined : pdfBuffer.toString('base64')
         };
     } catch (error) {
@@ -74,8 +79,26 @@ export const startWorker = () => {
         }
     );
 
-    worker.on('completed', (job) => {
+    worker.on('completed', async (job) => {
         console.log(`Job ${job.id} completed!`);
+
+        // --- BULK TRACKING LOGIC ---
+        if (job.data?.batchId && connection) {
+            try {
+                const batchId = job.data.batchId;
+                const resultUrl = job.returnvalue?.url;
+
+                // 1. Increment completed count
+                await connection.incr(`batch:${batchId}:completed`);
+
+                // 2. Add URL to the list (if we have one)
+                if (resultUrl) {
+                    await connection.rpush(`batch:${batchId}:urls`, resultUrl);
+                }
+            } catch (err) {
+                console.error("Failed to update batch stats", err);
+            }
+        }
     });
 
     worker.on('failed', (job, err) => {

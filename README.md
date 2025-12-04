@@ -50,7 +50,7 @@ RenderFlux includes a **Mock Queue** for testing without Redis.
     Ensure the root `.env` file has:
     ```env
     USE_MOCK_QUEUE=true
-    PORT=3002
+    PORT=3001
     ```
 
 2.  **Start the Stack**:
