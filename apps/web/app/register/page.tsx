@@ -2,35 +2,37 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card';
 import { createClient } from '@/lib/supabase';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Mail } from 'lucide-react';
 
 export default function RegisterPage() {
-    const router = useRouter();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isSuccess, setIsSuccess] = useState(false);
     const supabase = createClient();
 
     const handleRegister = async () => {
         setLoading(true);
         setError(null);
 
-        // 1. Sign Up
+        // 1. Sign Up with a random temp password (effectively a magic link flow)
+        // We do this so we can attach metadata (name) immediately.
+        const tempPassword = `mw_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+
         const { data, error: signUpError } = await supabase.auth.signUp({
             email,
-            password,
+            password: tempPassword,
             options: {
-                emailRedirectTo: `${location.origin}/auth/callback`,
-            },
+                data: { full_name: name },
+                // IMPORTANT: Redirect to our special callback handler
+                emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/setup-password`
+            }
         });
 
         if (signUpError) {
@@ -39,40 +41,25 @@ export default function RegisterPage() {
             return;
         }
 
-        if (data.user) {
-            // 2. Create Profile (Trigger handles this automatically in DB, but we can add extra fields if needed later)
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .update({ full_name: name })
-                .eq('id', data.user.id);
-
-            if (profileError) {
-                console.error('Error updating profile:', profileError);
-            }
-
-            setIsSuccess(true);
-            setLoading(false);
-        }
+        setSuccess(true);
+        setLoading(false);
     };
 
-    if (isSuccess) {
+    if (success) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
-                <Card className="w-full max-w-md border-slate-800 bg-slate-900 text-center py-8">
-                    <CardContent className="flex flex-col items-center space-y-6">
-                        <div className="rounded-full bg-green-500/10 p-4 ring-1 ring-green-500/50">
-                            <CheckCircle2 className="h-12 w-12 text-green-500" />
-                        </div>
-                        <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-slate-100">Verify your email</h2>
-                            <p className="text-slate-400 max-w-xs mx-auto">
-                                We've sent a verification link to <span className="text-slate-200 font-medium">{email}</span>. Please click it to activate your account.
-                            </p>
-                        </div>
-                        <Link href="/login" className="text-sm text-cyan-500 hover:underline">
-                            Back to Login
-                        </Link>
-                    </CardContent>
+                <Card className="w-full max-w-md border-slate-800 bg-slate-900 text-center p-6">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+                        <Mail className="h-8 w-8 text-green-500" />
+                    </div>
+                    <h2 className="mb-2 text-2xl font-bold text-slate-100">Check your email</h2>
+                    <p className="mb-6 text-slate-400">
+                        We've sent a temporary login link to <span className="font-medium text-slate-200">{email}</span>.
+                        <br />Click it to activate your account.
+                    </p>
+                    <Button variant="outline" onClick={() => setSuccess(false)} className="w-full border-slate-700">
+                        Back to Sign In
+                    </Button>
                 </Card>
             </div>
         );
@@ -86,7 +73,7 @@ export default function RegisterPage() {
                         Quickly get started
                     </CardTitle>
                     <CardDescription>
-                        Create an account to start generating PDFs
+                        Get started under a minute. No credit card required.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -96,7 +83,7 @@ export default function RegisterPage() {
                         </div>
                     )}
                     <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
+                        <Label htmlFor="name">Your Name</Label>
                         <Input
                             id="name"
                             placeholder="John Doe"
@@ -105,7 +92,7 @@ export default function RegisterPage() {
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">Email Address</Label>
                         <Input
                             id="email"
                             type="email"
@@ -114,39 +101,19 @@ export default function RegisterPage() {
                             onChange={(e) => setEmail(e.target.value)}
                         />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="language">Preferred Language</Label>
-                        <select
-                            id="language"
-                            className="flex h-10 w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-slate-200"
-                        >
-                            <option value="node">Node.js</option>
-                            <option value="python">Python</option>
-                            <option value="go">Go</option>
-                            <option value="php">PHP</option>
-                        </select>
-                    </div>
+
                     <Button
                         className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950"
                         onClick={handleRegister}
                         disabled={loading}
                     >
-                        {loading ? 'Creating Account...' : 'Create Account'}
+                        {loading ? 'Creating Account...' : 'Create free account'}
                     </Button>
                 </CardContent>
                 <CardFooter className="justify-center text-sm text-slate-400">
-                    Already have an account?{' '}
+                    Already a member?{' '}
                     <Link href="/login" className="ml-1 text-cyan-500 hover:underline">
-                        Sign in
+                        Login Here
                     </Link>
                 </CardFooter>
             </Card>
