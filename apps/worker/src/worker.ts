@@ -10,7 +10,7 @@ const USE_MOCK_QUEUE = process.env.USE_MOCK_QUEUE === 'true';
 
 const processJob = async (job: any) => {
     console.log(`Processing job ${job.id}...`);
-    const { html, templateId, data } = job.data;
+    const { html, templateId, data, type = 'pdf', options = {} } = job.data;
 
     let content = html || '';
 
@@ -34,22 +34,44 @@ const processJob = async (job: any) => {
 
     try {
         await page.setContent(content, {
-            waitUntil: 'networkidle',
+            waitUntil: options.waitFor || 'networkidle',
             timeout: 30000
         });
 
-        const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+        let outputBuffer: Buffer;
+        let extension: string;
+        let contentType: string;
 
-        const filename = `pdf-${job.id}-${Date.now()}.pdf`;
+        if (type === 'screenshot') {
+            outputBuffer = await page.screenshot({
+                fullPage: true,
+                type: 'jpeg',
+                quality: 80
+            }) as Buffer;
+            extension = 'jpg';
+            contentType = 'image/jpeg';
+        } else {
+            outputBuffer = await page.pdf({
+                format: options.format || 'A4',
+                printBackground: true,
+                landscape: options.landscape || false,
+                margin: options.margin
+            });
+            extension = 'pdf';
+            contentType = 'application/pdf';
+        }
+
+        const filename = `render-${job.id}-${Date.now()}.${extension}`;
 
         // Upload to R2
-        const url = await uploadPdf(filename, Buffer.from(pdfBuffer));
+        const url = await uploadPdf(filename, outputBuffer);
         console.log(`Uploaded to: ${url}`);
 
         return {
             url,
             // Only return base64 if upload failed or wasn't configured, otherwise keep payload light
-            pdf: url ? undefined : pdfBuffer.toString('base64')
+            result: url ? undefined : outputBuffer.toString('base64'),
+            contentType
         };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error);

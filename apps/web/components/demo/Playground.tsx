@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Label } from '@/components/ui/Label';
 
 export default function Playground() {
     const [html, setHtml] = useState('<h1>Hello RenderFlux</h1>\n<p>Edit me to see live updates!</p>');
@@ -13,6 +14,11 @@ export default function Playground() {
     const [progress, setProgress] = useState(0);
     const [isBatchMode, setIsBatchMode] = useState(false);
 
+    // New Options State
+    const [landscape, setLandscape] = useState(false);
+    const [format, setFormat] = useState('A4');
+    const [type, setType] = useState<'pdf' | 'screenshot'>('pdf');
+
     // Debounce render to avoid spamming API
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -20,7 +26,7 @@ export default function Playground() {
         }, 1000);
 
         return () => clearTimeout(timer);
-    }, [html]);
+    }, [html, landscape, format, type]);
 
     const handleRender = async () => {
         setLoading(true);
@@ -28,7 +34,14 @@ export default function Playground() {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/render`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html }),
+                body: JSON.stringify({
+                    html,
+                    type,
+                    options: {
+                        landscape,
+                        format,
+                    }
+                }),
             });
             const data = await res.json();
 
@@ -47,8 +60,9 @@ export default function Playground() {
                             // If result has URL, use it. If base64, construct data URI.
                             if (jobData.result.url) {
                                 setPdfUrl(jobData.result.url);
-                            } else if (jobData.result.pdf) {
-                                setPdfUrl(`data:application/pdf;base64,${jobData.result.pdf}`);
+                            } else if (jobData.result.result) {
+                                const prefix = type === 'screenshot' ? 'data:image/jpeg;base64,' : 'data:application/pdf;base64,';
+                                setPdfUrl(`${prefix}${jobData.result.result}`);
                             }
                         } else if (jobData.state === 'failed') {
                             clearInterval(interval);
@@ -78,6 +92,8 @@ export default function Playground() {
 
         const items = Array.from({ length: 50 }, (_, i) => ({
             html: html.replace('<h1>Hello RenderFlux</h1>', `<h1>Document ${i + 1}</h1>`),
+            type,
+            options: { landscape, format }
         }));
 
         try {
@@ -154,19 +170,65 @@ export default function Playground() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Editor Pane */}
-                <div className="w-1/2 border-r border-slate-800">
-                    <Editor
-                        height="100%"
-                        defaultLanguage="html"
-                        theme="vs-dark"
-                        value={html}
-                        onChange={(value) => setHtml(value || '')}
-                        options={{
-                            minimap: { enabled: false },
-                            fontSize: 14,
-                            padding: { top: 16 },
-                        }}
-                    />
+                <div className="w-1/2 border-r border-slate-800 flex flex-col">
+                    <div className="h-[70%]">
+                        <Editor
+                            height="100%"
+                            defaultLanguage="html"
+                            theme="vs-dark"
+                            value={html}
+                            onChange={(value) => setHtml(value || '')}
+                            options={{
+                                minimap: { enabled: false },
+                                fontSize: 14,
+                                padding: { top: 16 },
+                            }}
+                        />
+                    </div>
+                    {/* Options Panel */}
+                    <div className="h-[30%] border-t border-slate-800 bg-slate-900 p-4 overflow-y-auto">
+                        <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Render Options</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Output Type</Label>
+                                <select
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    value={type}
+                                    onChange={(e) => setType(e.target.value as 'pdf' | 'screenshot')}
+                                >
+                                    <option value="pdf">PDF Document</option>
+                                    <option value="screenshot">Screenshot (JPEG)</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Format</Label>
+                                <select
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    value={format}
+                                    onChange={(e) => setFormat(e.target.value)}
+                                    disabled={type === 'screenshot'}
+                                >
+                                    <option value="A4">A4</option>
+                                    <option value="Letter">Letter</option>
+                                    <option value="A3">A3</option>
+                                    <option value="Legal">Legal</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-6">
+                                <input
+                                    type="checkbox"
+                                    id="landscape"
+                                    checked={landscape}
+                                    onChange={(e) => setLandscape(e.target.checked)}
+                                    disabled={type === 'screenshot'}
+                                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+                                />
+                                <Label htmlFor="landscape">Landscape Mode</Label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Preview Pane */}
@@ -198,11 +260,19 @@ export default function Playground() {
                         </div>
                     ) : (
                         pdfUrl ? (
-                            <iframe
-                                src={pdfUrl}
-                                className="h-full w-full rounded border border-slate-700 bg-white"
-                                title="PDF Preview"
-                            />
+                            type === 'screenshot' ? (
+                                <img
+                                    src={pdfUrl}
+                                    alt="Screenshot Preview"
+                                    className="max-h-full max-w-full rounded border border-slate-700 shadow-lg"
+                                />
+                            ) : (
+                                <iframe
+                                    src={pdfUrl}
+                                    className="h-full w-full rounded border border-slate-700 bg-white"
+                                    title="PDF Preview"
+                                />
+                            )
                         ) : (
                             <div className="text-slate-500">
                                 {loading ? 'Generating Preview...' : 'Preview will appear here'}

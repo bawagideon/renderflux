@@ -16,7 +16,7 @@ app.use(express.json({ limit: '50mb' })); // Increased for bulk payloads
 // --- STANDARD RENDER ---
 app.post('/render', async (req: Request, res: Response) => {
     try {
-        const { html, templateId, data } = req.body;
+        const { html, templateId, data, type = 'pdf', options = {} } = req.body;
 
         if (!html && !templateId) {
             return res.status(400).json({ error: 'Missing html or templateId' });
@@ -26,6 +26,8 @@ app.post('/render', async (req: Request, res: Response) => {
             html,
             templateId,
             data,
+            type,
+            options,
         });
 
         res.json({ jobId: job.id, status: 'queued' });
