@@ -5,11 +5,13 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { ArrowRight, CheckCircle2, Code2, Server, FileText, Terminal, Check, X } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Server, FileText, Terminal, Check, X, ChevronDown, Lock, Zap, Globe, Database, ToggleRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LandingPage() {
     const [activeTab, setActiveTab] = useState<'node' | 'python' | 'curl' | 'php'>('node');
+    const [openFaq, setOpenFaq] = useState<number | null>(null);
 
     const codeSnippets = {
         node: `import axios from 'axios';
@@ -82,19 +84,26 @@ $response = $client->post('https://api.renderflux.io/render', [
 file_put_contents('invoice.pdf', $response->getBody());`
     };
 
+    const faqs = [
+        { q: "How does billing work?", a: "We charge based on the number of successful render requests. Failed requests are not billed. You can upgrade or downgrade your plan at any time." },
+        { q: "Can I self-host?", a: "Currently, RenderFlux is a managed cloud service. We handle the infrastructure scaling and maintenance so you don't have to." },
+        { q: "What is the retention policy?", a: "We do not store your generated PDFs. Once the response is sent to you, the file is deleted from our servers immediately for security." },
+        { q: "Do you support Puppeteer scripts?", a: "We support standard HTML/CSS rendering. For security and performance reasons, we do not currently support executing arbitrary Puppeteer scripts." }
+    ];
+
     return (
         <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
             {/* Header */}
             <header className="fixed top-0 w-full z-50 border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-md">
                 <div className="container mx-auto flex items-center justify-between py-4 px-4">
-                    <div className="flex items-center gap-2 font-bold text-xl text-slate-100">
+                    <Link href="/" className="flex items-center gap-2 font-bold text-xl text-slate-100">
                         <div className="h-6 w-6 rounded bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]" />
                         RenderFlux
-                    </div>
+                    </Link>
                     <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
                         <Link href="#features" className="hover:text-cyan-400 transition-colors">Features</Link>
-                        <Link href="#pricing" className="hover:text-cyan-400 transition-colors">Pricing</Link>
-                        <Link href="#docs" className="hover:text-cyan-400 transition-colors">Docs</Link>
+                        <Link href="/pricing" className="hover:text-cyan-400 transition-colors">Pricing</Link>
+                        <Link href="/docs" className="hover:text-cyan-400 transition-colors">Docs</Link>
                     </nav>
                     <div className="flex items-center gap-4">
                         <Link href="/login">
@@ -114,32 +123,45 @@ file_put_contents('invoice.pdf', $response->getBody());`
                 <section className="container mx-auto px-4 py-24 text-center lg:py-32 relative overflow-hidden">
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl -z-10" />
 
-                    <Badge variant="outline" className="mb-6 border-cyan-500/30 text-cyan-400 bg-cyan-500/5 px-4 py-1.5 text-sm backdrop-blur-sm">
-                        v2.0 is now live: Faster rendering engine
-                    </Badge>
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                    >
+                        <Badge variant="outline" className="mb-6 border-cyan-500/30 text-cyan-400 bg-cyan-500/5 px-4 py-1.5 text-sm backdrop-blur-sm">
+                            v2.0 is now live: Faster rendering engine
+                        </Badge>
 
-                    <h1 className="mx-auto max-w-5xl text-5xl font-extrabold tracking-tight text-slate-100 sm:text-7xl mb-8 leading-tight">
-                        The Enterprise <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">PDF Engine</span>
-                        <br />for Developers.
-                    </h1>
+                        <h1 className="mx-auto max-w-5xl text-5xl font-extrabold tracking-tight text-slate-100 sm:text-7xl mb-8 leading-tight">
+                            The Enterprise <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">PDF Engine</span>
+                            <br />for Developers.
+                        </h1>
 
-                    <p className="mx-auto max-w-2xl text-lg text-slate-400 mb-10 leading-relaxed">
-                        Convert HTML/CSS to PDF with pixel-perfect accuracy. Built for developers who need speed, reliability, and scale. Stop wrestling with Puppeteer.
-                    </p>
+                        <p className="mx-auto max-w-2xl text-lg text-slate-400 mb-10 leading-relaxed">
+                            Convert HTML/CSS to PDF with pixel-perfect accuracy. Built for developers who need speed, reliability, and scale. Stop wrestling with Puppeteer.
+                        </p>
 
-                    <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
-                        <Link href="/dashboard">
-                            <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 h-14 px-8 text-lg font-semibold shadow-[0_0_20px_rgba(6,182,212,0.3)] w-full sm:w-auto">
-                                Start Building for Free <ArrowRight className="ml-2 h-5 w-5" />
-                            </Button>
-                        </Link>
-                        <Button variant="outline" size="lg" className="h-14 px-8 text-lg border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white w-full sm:w-auto">
-                            View Documentation
-                        </Button>
-                    </div>
+                        <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+                            <Link href="/dashboard">
+                                <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 h-14 px-8 text-lg font-semibold shadow-[0_0_20px_rgba(6,182,212,0.3)] w-full sm:w-auto">
+                                    Start Building for Free <ArrowRight className="ml-2 h-5 w-5" />
+                                </Button>
+                            </Link>
+                            <Link href="/docs">
+                                <Button variant="outline" size="lg" className="h-14 px-8 text-lg border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white w-full sm:w-auto">
+                                    View Documentation
+                                </Button>
+                            </Link>
+                        </div>
+                    </motion.div>
 
                     {/* Trusted By */}
-                    <div className="pt-8 border-t border-slate-800/50 max-w-4xl mx-auto">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5, duration: 0.5 }}
+                        className="pt-8 border-t border-slate-800/50 max-w-4xl mx-auto"
+                    >
                         <p className="text-sm text-slate-500 mb-6 font-medium uppercase tracking-wider">Trusted by engineering teams at</p>
                         <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
                             {['Acme Corp', 'Globex', 'Soylent', 'Initech', 'Umbrella'].map((company) => (
@@ -149,65 +171,110 @@ file_put_contents('invoice.pdf', $response->getBody());`
                                 </span>
                             ))}
                         </div>
+                    </motion.div>
+                </section>
+
+                {/* Sticky Scroll Features */}
+                <section id="features" className="py-24 bg-slate-900/30 border-y border-slate-800/50">
+                    <div className="container mx-auto px-4">
+                        <div className="grid md:grid-cols-2 gap-16 items-start">
+                            <div className="sticky top-32 space-y-12">
+                                <div className="space-y-4">
+                                    <div className="w-12 h-12 bg-cyan-500/10 rounded-lg flex items-center justify-center border border-cyan-500/20">
+                                        <Zap className="w-6 h-6 text-cyan-400" />
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-slate-100">Atomic Batching</h3>
+                                    <p className="text-lg text-slate-400 leading-relaxed">
+                                        Process thousands of documents in parallel. Our batching engine handles the queueing, retries, and concurrency for you.
+                                    </p>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center border border-purple-500/20">
+                                        <Database className="w-6 h-6 text-purple-400" />
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-slate-100">Smart Caching</h3>
+                                    <p className="text-lg text-slate-400 leading-relaxed">
+                                        We automatically cache identical requests at the edge, reducing latency and costs for frequently generated documents.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="space-y-8">
+                                <Card className="bg-slate-950 border-slate-800 overflow-hidden shadow-2xl">
+                                    <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500/20" />
+                                        <div className="w-3 h-3 rounded-full bg-yellow-500/20" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500/20" />
+                                        <span className="ml-2 text-xs text-slate-500 font-mono">batch_request.json</span>
+                                    </div>
+                                    <div className="p-6 font-mono text-sm text-slate-300">
+                                        <div className="text-purple-400">POST /v1/batch</div>
+                                        <div className="text-slate-500">{`{`}</div>
+                                        <div className="pl-4">
+                                            <span className="text-cyan-400">"items"</span>: [
+                                        </div>
+                                        <div className="pl-8 text-slate-400">
+                                            {`{ "html": "<h1>Doc 1</h1>" },`}
+                                        </div>
+                                        <div className="pl-8 text-slate-400">
+                                            {`{ "html": "<h1>Doc 2</h1>" },`}
+                                        </div>
+                                        <div className="pl-8 text-slate-500">...</div>
+                                        <div className="pl-4">]</div>
+                                        <div className="text-slate-500">{`}`}</div>
+                                    </div>
+                                </Card>
+                                <div className="h-64 bg-gradient-to-br from-purple-500/10 to-cyan-500/10 rounded-xl border border-slate-800 flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" />
+                                    <div className="relative z-10 text-center">
+                                        <div className="text-5xl font-bold text-slate-100 mb-2">95ms</div>
+                                        <div className="text-slate-400">Average Cache Hit Latency</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
-                {/* How it Works */}
-                <section className="py-24 bg-slate-900/50 border-y border-slate-800/50">
-                    <div className="container mx-auto px-4">
-                        <div className="text-center mb-16">
-                            <h2 className="text-3xl font-bold text-slate-100 mb-4">How RenderFlux Works</h2>
-                            <p className="text-slate-400 max-w-2xl mx-auto">
-                                Simple, reliable, and fast. Just send us your HTML, and we'll handle the rest.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row items-center justify-center gap-8 max-w-5xl mx-auto">
-                            <Card className="flex-1 bg-slate-950 border-slate-800 relative overflow-hidden group hover:border-cyan-500/50 transition-colors">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <CardHeader className="text-center">
-                                    <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.1)] transition-all">
-                                        <Code2 className="w-8 h-8 text-cyan-500" />
-                                    </div>
-                                    <CardTitle className="text-xl">1. Send JSON</CardTitle>
-                                    <CardDescription>
-                                        Send your HTML or URL via our REST API.
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-
-                            <ArrowRight className="hidden md:block w-8 h-8 text-slate-700" />
-                            <div className="md:hidden w-px h-12 bg-slate-800" />
-
-                            <Card className="flex-1 bg-slate-950 border-slate-800 relative overflow-hidden group hover:border-purple-500/50 transition-colors">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <CardHeader className="text-center">
-                                    <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 group-hover:border-purple-500/30 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] transition-all">
-                                        <Server className="w-8 h-8 text-purple-500" />
-                                    </div>
-                                    <CardTitle className="text-xl">2. We Render</CardTitle>
-                                    <CardDescription>
-                                        Our cluster renders it in a headless Chrome instance.
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-
-                            <ArrowRight className="hidden md:block w-8 h-8 text-slate-700" />
-                            <div className="md:hidden w-px h-12 bg-slate-800" />
-
-                            <Card className="flex-1 bg-slate-950 border-slate-800 relative overflow-hidden group hover:border-green-500/50 transition-colors">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <CardHeader className="text-center">
-                                    <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 group-hover:border-green-500/30 group-hover:shadow-[0_0_20px_rgba(34,197,94,0.1)] transition-all">
-                                        <FileText className="w-8 h-8 text-green-500" />
-                                    </div>
-                                    <CardTitle className="text-xl">3. Get PDF</CardTitle>
-                                    <CardDescription>
-                                        Receive your pixel-perfect PDF instantly.
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </div>
+                {/* Bento Grid */}
+                <section className="py-24 container mx-auto px-4">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl font-bold text-slate-100 mb-4">Everything you need</h2>
+                        <p className="text-slate-400 max-w-2xl mx-auto">
+                            Built for reliability and scale.
+                        </p>
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                        <Card className="md:col-span-2 bg-slate-900 border-slate-800 overflow-hidden relative group">
+                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Globe className="w-5 h-5 text-cyan-500" /> Global Edge</CardTitle>
+                                <CardDescription>Requests are routed to the nearest region for lowest latency.</CardDescription>
+                            </CardHeader>
+                            <div className="h-32 bg-slate-950/50 mt-4 mx-6 rounded-t-lg border-t border-x border-slate-800 relative">
+                                <div className="absolute top-1/2 left-1/4 w-2 h-2 bg-cyan-500 rounded-full animate-ping" />
+                                <div className="absolute top-1/3 left-2/3 w-2 h-2 bg-purple-500 rounded-full animate-ping" />
+                                <div className="absolute bottom-1/4 left-1/2 w-2 h-2 bg-green-500 rounded-full animate-ping" />
+                            </div>
+                        </Card>
+                        <Card className="bg-slate-900 border-slate-800 group hover:border-slate-700 transition-colors">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><ToggleRight className="w-5 h-5 text-purple-500" /> Zero Config</CardTitle>
+                                <CardDescription>No servers to manage. Just API keys.</CardDescription>
+                            </CardHeader>
+                        </Card>
+                        <Card className="bg-slate-900 border-slate-800 group hover:border-slate-700 transition-colors">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5 text-green-500" /> Secure</CardTitle>
+                                <CardDescription>SOC2 Compliant infrastructure.</CardDescription>
+                            </CardHeader>
+                        </Card>
+                        <Card className="md:col-span-2 bg-slate-900 border-slate-800 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-yellow-500" /> 99.9% Uptime</CardTitle>
+                                <CardDescription>Guaranteed by our SLA for enterprise customers.</CardDescription>
+                            </CardHeader>
+                        </Card>
                     </div>
                 </section>
 
@@ -268,94 +335,52 @@ file_put_contents('invoice.pdf', $response->getBody());`
                     </div>
                 </section>
 
-                {/* Use Cases Bento Grid */}
-                <section className="py-24 bg-slate-900/30 border-y border-slate-800/50">
-                    <div className="container mx-auto px-4">
-                        <div className="text-center mb-16">
-                            <h2 className="text-3xl font-bold text-slate-100 mb-4">Built for every use case</h2>
-                            <p className="text-slate-400 max-w-2xl mx-auto">
-                                From simple invoices to complex reports, RenderFlux handles it all.
-                            </p>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                            {[
-                                { title: 'Invoices & Receipts', icon: FileText, desc: 'Generate millions of invoices with dynamic data.' },
-                                { title: 'Legal Contracts', icon: CheckCircle2, desc: 'Create secure, read-only PDF contracts.' },
-                                { title: 'Reports & Analytics', icon: ArrowRight, desc: 'Turn your dashboards into downloadable reports.' },
-                                { title: 'Tickets & Vouchers', icon: Terminal, desc: 'Generate QR-code enabled tickets instantly.' }
-                            ].map((item, i) => (
-                                <Card key={i} className="bg-slate-950 border-slate-800 hover:border-slate-700 transition-all hover:shadow-lg group">
-                                    <CardHeader>
-                                        <div className="w-12 h-12 bg-slate-900 rounded-lg flex items-center justify-center mb-4 group-hover:bg-slate-800 transition-colors">
-                                            <item.icon className="w-6 h-6 text-cyan-500" />
-                                        </div>
-                                        <CardTitle className="text-slate-100">{item.title}</CardTitle>
-                                        <CardDescription className="text-slate-400">
-                                            {item.desc}
-                                        </CardDescription>
-                                    </CardHeader>
-                                </Card>
-                            ))}
-                        </div>
+                {/* Interactive FAQ */}
+                <section className="py-24 container mx-auto px-4">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl font-bold text-slate-100 mb-4">Frequently Asked Questions</h2>
+                    </div>
+                    <div className="max-w-3xl mx-auto space-y-4">
+                        {faqs.map((faq, i) => (
+                            <div key={i} className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                                <button
+                                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                                    className="w-full flex items-center justify-between p-6 text-left hover:bg-slate-800/50 transition-colors"
+                                >
+                                    <span className="font-medium text-slate-200">{faq.q}</span>
+                                    <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                                </button>
+                                <AnimatePresence>
+                                    {openFaq === i && (
+                                        <motion.div
+                                            initial={{ height: 0 }}
+                                            animate={{ height: 'auto' }}
+                                            exit={{ height: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="p-6 pt-0 text-slate-400 border-t border-slate-800/50">
+                                                {faq.a}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        ))}
                     </div>
                 </section>
 
-                {/* Comparison Section */}
-                <section className="py-24 container mx-auto px-4">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl font-bold text-slate-100 mb-4">Why RenderFlux?</h2>
-                        <p className="text-slate-400 max-w-2xl mx-auto">
-                            Stop managing headless Chrome instances. Let us handle the infrastructure.
-                        </p>
-                    </div>
-
-                    <div className="max-w-4xl mx-auto bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-800 bg-slate-950/50">
-                                    <th className="p-6 text-slate-400 font-medium">Feature</th>
-                                    <th className="p-6 text-cyan-400 font-bold text-lg">RenderFlux</th>
-                                    <th className="p-6 text-slate-400 font-medium">Puppeteer / DIY</th>
-                                    <th className="p-6 text-slate-400 font-medium">Competitors</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                                <tr>
-                                    <td className="p-6 text-slate-200 font-medium">Speed</td>
-                                    <td className="p-6 text-cyan-400 font-bold flex items-center gap-2">
-                                        <Check className="w-4 h-4" /> Instant
-                                    </td>
-                                    <td className="p-6 text-slate-500">Slow (Cold starts)</td>
-                                    <td className="p-6 text-slate-500">Variable</td>
-                                </tr>
-                                <tr>
-                                    <td className="p-6 text-slate-200 font-medium">Maintenance</td>
-                                    <td className="p-6 text-cyan-400 font-bold flex items-center gap-2">
-                                        <Check className="w-4 h-4" /> Zero
-                                    </td>
-                                    <td className="p-6 text-slate-500">High (Updates, Crashing)</td>
-                                    <td className="p-6 text-slate-500">Zero</td>
-                                </tr>
-                                <tr>
-                                    <td className="p-6 text-slate-200 font-medium">Cost</td>
-                                    <td className="p-6 text-cyan-400 font-bold flex items-center gap-2">
-                                        <Check className="w-4 h-4" /> Low
-                                    </td>
-                                    <td className="p-6 text-slate-500">High (Server costs)</td>
-                                    <td className="p-6 text-slate-500">Expensive</td>
-                                </tr>
-                                <tr>
-                                    <td className="p-6 text-slate-200 font-medium">Scalability</td>
-                                    <td className="p-6 text-cyan-400 font-bold flex items-center gap-2">
-                                        <Check className="w-4 h-4" /> Infinite
-                                    </td>
-                                    <td className="p-6 text-slate-500">Hard to scale</td>
-                                    <td className="p-6 text-slate-500">Limited</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                {/* CTA Section */}
+                <section className="py-32 container mx-auto px-4 text-center relative overflow-hidden">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-full blur-3xl -z-10" />
+                    <h2 className="text-4xl font-bold text-slate-100 mb-6">Ready to start building?</h2>
+                    <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
+                        Join thousands of developers generating millions of PDFs every month.
+                    </p>
+                    <Link href="/register">
+                        <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 h-14 px-12 text-lg font-bold shadow-[0_0_30px_rgba(6,182,212,0.4)] hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] transition-all transform hover:-translate-y-1">
+                            Get Started for Free
+                        </Button>
+                    </Link>
                 </section>
 
                 {/* Footer */}
@@ -374,8 +399,8 @@ file_put_contents('invoice.pdf', $response->getBody());`
                             <div>
                                 <h4 className="font-bold text-slate-100 mb-4">Product</h4>
                                 <ul className="space-y-2 text-sm text-slate-400">
-                                    <li><Link href="#" className="hover:text-cyan-400">Features</Link></li>
-                                    <li><Link href="#" className="hover:text-cyan-400">Pricing</Link></li>
+                                    <li><Link href="#features" className="hover:text-cyan-400">Features</Link></li>
+                                    <li><Link href="/pricing" className="hover:text-cyan-400">Pricing</Link></li>
                                     <li><Link href="#" className="hover:text-cyan-400">API</Link></li>
                                     <li><Link href="#" className="hover:text-cyan-400">Showcase</Link></li>
                                 </ul>
@@ -383,7 +408,7 @@ file_put_contents('invoice.pdf', $response->getBody());`
                             <div>
                                 <h4 className="font-bold text-slate-100 mb-4">Resources</h4>
                                 <ul className="space-y-2 text-sm text-slate-400">
-                                    <li><Link href="#" className="hover:text-cyan-400">Documentation</Link></li>
+                                    <li><Link href="/docs" className="hover:text-cyan-400">Documentation</Link></li>
                                     <li><Link href="#" className="hover:text-cyan-400">Blog</Link></li>
                                     <li><Link href="#" className="hover:text-cyan-400">Community</Link></li>
                                     <li><Link href="#" className="hover:text-cyan-400">Help Center</Link></li>
