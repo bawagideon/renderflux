@@ -27,7 +27,11 @@ export default function LoginPage() {
         });
 
         if (error) {
-            setError(error.message);
+            if (error.message.includes('Email not confirmed')) {
+                setError('Please verify your email first. Check your inbox.');
+            } else {
+                setError(error.message);
+            }
             setLoading(false);
         } else {
             router.push('/dashboard');

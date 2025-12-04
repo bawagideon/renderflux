@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card';
 import { createClient } from '@/lib/supabase';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -16,6 +17,7 @@ export default function RegisterPage() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isSuccess, setIsSuccess] = useState(false);
     const supabase = createClient();
 
     const handleRegister = async () => {
@@ -26,6 +28,9 @@ export default function RegisterPage() {
         const { data, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+                emailRedirectTo: `${location.origin}/auth/callback`,
+            },
         });
 
         if (signUpError) {
@@ -36,8 +41,6 @@ export default function RegisterPage() {
 
         if (data.user) {
             // 2. Create Profile (Trigger handles this automatically in DB, but we can add extra fields if needed later)
-            // For now, the trigger handles id and email. We might want to update full_name.
-
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({ full_name: name })
@@ -45,13 +48,35 @@ export default function RegisterPage() {
 
             if (profileError) {
                 console.error('Error updating profile:', profileError);
-                // Non-blocking error
             }
 
-            router.push('/dashboard');
-            router.refresh();
+            setIsSuccess(true);
+            setLoading(false);
         }
     };
+
+    if (isSuccess) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+                <Card className="w-full max-w-md border-slate-800 bg-slate-900 text-center py-8">
+                    <CardContent className="flex flex-col items-center space-y-6">
+                        <div className="rounded-full bg-green-500/10 p-4 ring-1 ring-green-500/50">
+                            <CheckCircle2 className="h-12 w-12 text-green-500" />
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold text-slate-100">Verify your email</h2>
+                            <p className="text-slate-400 max-w-xs mx-auto">
+                                We've sent a verification link to <span className="text-slate-200 font-medium">{email}</span>. Please click it to activate your account.
+                            </p>
+                        </div>
+                        <Link href="/login" className="text-sm text-cyan-500 hover:underline">
+                            Back to Login
+                        </Link>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
