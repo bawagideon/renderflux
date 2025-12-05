@@ -1,109 +1,186 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Activity, CreditCard, Key, FileText, ArrowRight, ExternalLink, Zap } from 'lucide-react';
+import Link from 'next/link';
 import { UsageBar } from '@/components/dashboard/UsageBar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const data = [
-    { name: 'Day 1', renders: 40 },
-    { name: 'Day 5', renders: 30 },
-    { name: 'Day 10', renders: 20 },
-    { name: 'Day 15', renders: 27 },
-    { name: 'Day 20', renders: 18 },
-    { name: 'Day 25', renders: 23 },
-    { name: 'Day 30', renders: 34 },
-];
+import { createClient } from '@/lib/supabase';
+import { getUsageStats, getRecentLogs, getUserPlan } from '@/lib/api';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardPage() {
+    const supabase = createClient();
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({ total_requests: 0, credits_used: 0 });
+    const [plan, setPlan] = useState({ plan: 'hobby', credits_limit: 50 });
+    const [recentLogs, setRecentLogs] = useState<any[]>([]);
+
+    useEffect(() => {
+        async function loadData() {
+            setLoading(true);
+            try {
+                const [usageData, planData, logsData] = await Promise.all([
+                    getUsageStats(supabase),
+                    getUserPlan(supabase),
+                    getRecentLogs(supabase, 5)
+                ]);
+
+                setStats(usageData);
+                setPlan(planData);
+                setRecentLogs(logsData);
+            } catch (error) {
+                console.error('Failed to load dashboard data', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadData();
+    }, []);
+
+    const usagePercentage = Math.min(100, (stats.credits_used / plan.credits_limit) * 100);
+
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-slate-100">Overview</h1>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div>
+                <h1 className="text-3xl font-bold text-slate-100 mb-2">Overview</h1>
+                <p className="text-slate-400">Welcome back to RenderFlux.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="col-span-2">
-                    <CardHeader>
-                        <CardTitle>Usage</CardTitle>
+            {/* Stats Row */}
+            <div className="grid md:grid-cols-3 gap-6">
+                <Card className="bg-slate-900 border-slate-800">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-400">Current Plan</CardTitle>
+                        <CreditCard className="h-4 w-4 text-cyan-500" />
                     </CardHeader>
                     <CardContent>
-                        <UsageBar used={0} total={500} />
+                        <div className="text-2xl font-bold text-slate-100 capitalize">{plan.plan}</div>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {plan.plan === 'hobby' ? 'Free Forever' : '$29/month'}
+                        </p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Renders</CardTitle>
+                <Card className="bg-slate-900 border-slate-800">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-400">Total Requests</CardTitle>
+                        <Activity className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">0</div>
-                        <p className="text-xs text-slate-500">+0% from last month</p>
+                        <div className="text-2xl font-bold text-slate-100">{stats.total_requests.toLocaleString()}</div>
+                        <p className="text-xs text-slate-500 mt-1">
+                            This month
+                        </p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+                <Card className="bg-slate-900 border-slate-800">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-400">API Keys</CardTitle>
+                        <Key className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">100%</div>
-                        <p className="text-xs text-slate-500">+0% from last month</p>
+                        <div className="text-2xl font-bold text-slate-100">Active</div>
+                        <div className="mt-2">
+                            <Link href="/dashboard/keys" className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                                Manage Keys <ArrowRight className="w-3 h-3" />
+                            </Link>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <Card className="col-span-4">
+            {/* Usage Section */}
+            <Card className="bg-slate-900 border-slate-800">
                 <CardHeader>
-                    <CardTitle>Render History (Last 30 Days)</CardTitle>
+                    <CardTitle className="text-lg text-slate-100">Usage Limits</CardTitle>
+                    <CardDescription>Reset on the 1st of every month</CardDescription>
                 </CardHeader>
-                <CardContent className="pl-2">
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                                data={data}
-                                margin={{
-                                    top: 10,
-                                    right: 30,
-                                    left: 0,
-                                    bottom: 0,
-                                }}
-                            >
-                                <defs>
-                                    <linearGradient id="colorRenders" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                <XAxis
-                                    dataKey="name"
-                                    stroke="#64748b"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <YAxis
-                                    stroke="#64748b"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) => `${value}`}
-                                />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
-                                    itemStyle={{ color: '#06b6d4' }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="renders"
-                                    stroke="#06b6d4"
-                                    strokeWidth={2}
-                                    fillOpacity={1}
-                                    fill="url(#colorRenders)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                <CardContent>
+                    <UsageBar
+                        used={stats.credits_used}
+                        total={plan.credits_limit}
+                        label="Monthly Credits"
+                    />
+                    <div className="mt-4 text-right">
+                        {plan.plan === 'hobby' && (
+                            <Link href="/dashboard/billing">
+                                <Button variant="outline" size="sm" className="text-xs border-slate-700 text-slate-300 hover:text-white">
+                                    Upgrade Plan
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Recent Activity */}
+            <div>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-slate-100">Recent Activity</h2>
+                    <Link href="/dashboard/logs">
+                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-slate-200">
+                            View All
+                        </Button>
+                    </Link>
+                </div>
+
+                {loading ? (
+                    <div className="h-32 flex items-center justify-center border border-slate-800 rounded-lg bg-slate-900/50">
+                        <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : recentLogs.length > 0 ? (
+                    <div className="border border-slate-800 rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-900 text-slate-400 font-medium">
+                                <tr>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4">Method</th>
+                                    <th className="p-4">Path</th>
+                                    <th className="p-4">Duration</th>
+                                    <th className="p-4 text-right">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800 bg-slate-950">
+                                {recentLogs.map((log) => (
+                                    <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
+                                        <td className="p-4">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${log.status >= 200 && log.status < 300
+                                                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                }`}>
+                                                {log.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 font-mono text-slate-300">{log.method}</td>
+                                        <td className="p-4 font-mono text-slate-400">{log.path}</td>
+                                        <td className="p-4 text-slate-400">{log.duration_ms}ms</td>
+                                        <td className="p-4 text-right text-slate-500">
+                                            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center py-12 border border-dashed border-slate-800 rounded-lg bg-slate-900/20">
+                        <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Zap className="w-6 h-6 text-slate-500" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-200 mb-2">No activity yet</h3>
+                        <p className="text-slate-400 mb-6 max-w-sm mx-auto">
+                            Send your first API request to see it appear here. Check out the playground to get started.
+                        </p>
+                        <Link href="/dashboard/playground">
+                            <Button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold">
+                                Go to Playground
+                            </Button>
+                        </Link>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

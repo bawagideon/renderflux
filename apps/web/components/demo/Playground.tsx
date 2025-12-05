@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Label } from '@/components/ui/Label';
+import { createClient } from '@/lib/supabase';
 
 export default function Playground() {
     const [html, setHtml] = useState('<h1>Hello RenderFlux</h1>\n<p>Edit me to see live updates!</p>');
@@ -18,6 +19,7 @@ export default function Playground() {
     const [landscape, setLandscape] = useState(false);
     const [format, setFormat] = useState('A4');
     const [type, setType] = useState<'pdf' | 'screenshot'>('pdf');
+    const supabase = createClient();
 
     // Debounce render to avoid spamming API
     useEffect(() => {
@@ -40,7 +42,8 @@ export default function Playground() {
                     options: {
                         landscape,
                         format,
-                    }
+                    },
+                    userId: (await supabase.auth.getUser()).data.user?.id
                 }),
             });
             const data = await res.json();

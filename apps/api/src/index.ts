@@ -30,6 +30,18 @@ app.post('/render', async (req: Request, res: Response) => {
             options,
         });
 
+        // Log the request
+        const userId = req.body.userId;
+        if (userId) {
+            await supabase.from('usage_logs').insert({
+                user_id: userId,
+                action: 'render',
+                status: 'queued',
+                duration_ms: 0,
+                created_at: new Date().toISOString()
+            });
+        }
+
         res.json({ jobId: job.id, status: 'queued' });
     } catch (error) {
         console.error('Error queuing job:', error);
