@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { UsageBar } from '@/components/dashboard/UsageBar';
 import { OverviewChart } from '@/components/dashboard/OverviewChart';
 import { createClient } from '@/lib/supabase';
-import { getUsageStats, getRecentLogs, getUserPlan, getDailyStats } from '@/lib/api';
+import { getUsageStats, getRecentLogs, getUserPlan, getDailyStats, getApiKeyCount } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardPage() {
@@ -18,22 +18,25 @@ export default function DashboardPage() {
     const [plan, setPlan] = useState({ plan: 'hobby', credits_limit: 50 });
     const [recentLogs, setRecentLogs] = useState<any[]>([]);
     const [dailyStats, setDailyStats] = useState<{ name: string; total: number }[]>([]);
+    const [apiKeyCount, setApiKeyCount] = useState(0);
 
     useEffect(() => {
         async function loadData() {
             setLoading(true);
             try {
-                const [usageData, planData, logsData, dailyData] = await Promise.all([
+                const [usageData, planData, logsData, dailyData, keysCount] = await Promise.all([
                     getUsageStats(supabase),
                     getUserPlan(supabase),
                     getRecentLogs(supabase, 5),
-                    getDailyStats(supabase)
+                    getDailyStats(supabase),
+                    getApiKeyCount(supabase)
                 ]);
 
                 setStats(usageData);
                 setPlan(planData);
                 setRecentLogs(logsData);
                 setDailyStats(dailyData);
+                setApiKeyCount(keysCount);
             } catch (error) {
                 console.error('Failed to load dashboard data', error);
             } finally {
@@ -85,7 +88,7 @@ export default function DashboardPage() {
                         <Key className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-slate-100">Active</div>
+                        <div className="text-2xl font-bold text-slate-100">{apiKeyCount} Active</div>
                         <div className="mt-2">
                             <Link href="/dashboard/keys" className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
                                 Manage Keys <ArrowRight className="w-3 h-3" />
