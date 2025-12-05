@@ -71,3 +71,43 @@ export async function getUserPlan(supabase: SupabaseClient) {
         credits_limit: limits[plan] || 50
     };
 }
+
+export async function getDailyStats(supabase: SupabaseClient) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const { data, error } = await supabase
+        .from('usage_logs')
+        .select('created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', thirtyDaysAgo.toISOString());
+
+    if (error) {
+        console.error('Error fetching daily stats:', error);
+        return [];
+    }
+
+    // Group by date
+    const stats: Record<string, number> = {};
+    data.forEach((log) => {
+        const date = new Date(log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        stats[date] = (stats[date] || 0) + 1;
+    });
+
+    // Fill in last 7 days at least
+    const chartData = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        chartData.push({
+            name: dateStr,
+            total: stats[dateStr] || 0
+        });
+    }
+
+    return chartData;
+}

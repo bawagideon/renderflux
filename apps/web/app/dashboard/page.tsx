@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/Button';
 import { Activity, CreditCard, Key, FileText, ArrowRight, ExternalLink, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { UsageBar } from '@/components/dashboard/UsageBar';
+import { OverviewChart } from '@/components/dashboard/OverviewChart';
 import { createClient } from '@/lib/supabase';
-import { getUsageStats, getRecentLogs, getUserPlan } from '@/lib/api';
+import { getUsageStats, getRecentLogs, getUserPlan, getDailyStats } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardPage() {
@@ -16,20 +17,23 @@ export default function DashboardPage() {
     const [stats, setStats] = useState({ total_requests: 0, credits_used: 0 });
     const [plan, setPlan] = useState({ plan: 'hobby', credits_limit: 50 });
     const [recentLogs, setRecentLogs] = useState<any[]>([]);
+    const [dailyStats, setDailyStats] = useState<{ name: string; total: number }[]>([]);
 
     useEffect(() => {
         async function loadData() {
             setLoading(true);
             try {
-                const [usageData, planData, logsData] = await Promise.all([
+                const [usageData, planData, logsData, dailyData] = await Promise.all([
                     getUsageStats(supabase),
                     getUserPlan(supabase),
-                    getRecentLogs(supabase, 5)
+                    getRecentLogs(supabase, 5),
+                    getDailyStats(supabase)
                 ]);
 
                 setStats(usageData);
                 setPlan(planData);
                 setRecentLogs(logsData);
+                setDailyStats(dailyData);
             } catch (error) {
                 console.error('Failed to load dashboard data', error);
             } finally {
@@ -91,29 +95,38 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            {/* Usage Section */}
-            <Card className="bg-slate-900 border-slate-800">
-                <CardHeader>
-                    <CardTitle className="text-lg text-slate-100">Usage Limits</CardTitle>
-                    <CardDescription>Reset on the 1st of every month</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <UsageBar
-                        used={stats.credits_used}
-                        total={plan.credits_limit}
-                        label="Monthly Credits"
-                    />
-                    <div className="mt-4 text-right">
-                        {plan.plan === 'hobby' && (
-                            <Link href="/dashboard/billing">
-                                <Button variant="outline" size="sm" className="text-xs border-slate-700 text-slate-300 hover:text-white">
-                                    Upgrade Plan
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                <Card className="col-span-4 bg-slate-900 border-slate-800">
+                    <CardHeader>
+                        <CardTitle className="text-slate-100">Overview</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pl-2">
+                        <OverviewChart data={dailyStats} />
+                    </CardContent>
+                </Card>
+                <Card className="col-span-3 bg-slate-900 border-slate-800">
+                    <CardHeader>
+                        <CardTitle className="text-lg text-slate-100">Usage Limits</CardTitle>
+                        <CardDescription>Reset on the 1st of every month</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <UsageBar
+                            used={stats.credits_used}
+                            total={plan.credits_limit}
+                            label="Monthly Credits"
+                        />
+                        <div className="mt-4 text-right">
+                            {plan.plan === 'hobby' && (
+                                <Link href="/dashboard/billing">
+                                    <Button variant="outline" size="sm" className="text-xs border-slate-700 text-slate-300 hover:text-white">
+                                        Upgrade Plan
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* Recent Activity */}
             <div>
@@ -136,8 +149,7 @@ export default function DashboardPage() {
                             <thead className="bg-slate-900 text-slate-400 font-medium">
                                 <tr>
                                     <th className="p-4">Status</th>
-                                    <th className="p-4">Method</th>
-                                    <th className="p-4">Path</th>
+                                    <th className="p-4">Action</th>
                                     <th className="p-4">Duration</th>
                                     <th className="p-4 text-right">Time</th>
                                 </tr>
@@ -146,15 +158,16 @@ export default function DashboardPage() {
                                 {recentLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
                                         <td className="p-4">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${log.status >= 200 && log.status < 300
-                                                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${log.status === 'completed' || (log.status >= 200 && log.status < 300)
+                                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                : log.status === 'queued'
+                                                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                    : 'bg-red-500/10 text-red-400 border-red-500/20'
                                                 }`}>
-                                                {log.status}
+                                                {log.status === 'queued' ? 'Processing' : log.status}
                                             </span>
                                         </td>
-                                        <td className="p-4 font-mono text-slate-300">{log.method}</td>
-                                        <td className="p-4 font-mono text-slate-400">{log.path}</td>
+                                        <td className="p-4 font-mono text-slate-300 capitalize">{log.action || 'Render'}</td>
                                         <td className="p-4 text-slate-400">{log.duration_ms}ms</td>
                                         <td className="p-4 text-right text-slate-500">
                                             {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
