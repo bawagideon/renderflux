@@ -1,66 +1,74 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { createClient } from '@/lib/supabase';
+import { Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
     const supabase = createClient();
-    const [loading, setLoading] = useState(false);
-    const [user, setUser] = useState<any>(null);
-    const [profile, setProfile] = useState({ full_name: '', company_name: '', vat_number: '' });
-    const [message, setMessage] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [profile, setProfile] = useState({
+        full_name: '',
+        email: '',
+        company_name: '',
+        vat_number: ''
+    });
 
+    // 1. Fetch Profile on Mount
     useEffect(() => {
         async function loadProfile() {
-            setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setUser(user);
-                // Fetch profile
-                const { data } = await supabase
-                    .from('profiles')
-                    .select('full_name, company_name, vat_number')
-                    .eq('id', user.id)
-                    .single();
+            if (!user) return;
 
-                if (data) {
-                    setProfile({
-                        full_name: data.full_name || '',
-                        company_name: data.company_name || '',
-                        vat_number: data.vat_number || ''
-                    });
-                }
+            // Fetch existing profile data
+            const { data } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (data) {
+                setProfile({
+                    full_name: data.full_name || '',
+                    email: user.email || '', // Email comes from Auth, not necessarily profile table
+                    company_name: data.company_name || '',
+                    vat_number: data.vat_number || ''
+                });
             }
             setLoading(false);
         }
         loadProfile();
     }, []);
 
+    // 2. Save Changes
     const handleSave = async () => {
+        setSaving(true);
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        setLoading(true);
-        setMessage(null);
 
-        try {
-            const { error } = await supabase
-                .from('profiles')
-                .update(profile)
-                .eq('id', user.id);
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                full_name: profile.full_name,
+                company_name: profile.company_name,
+                vat_number: profile.vat_number
+            })
+            .eq('id', user.id);
 
-            if (error) throw error;
-            setMessage('Settings saved successfully!');
-            setTimeout(() => setMessage(null), 3000);
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            setMessage('Failed to save settings.');
-        } finally {
-            setLoading(false);
+        setSaving(false);
+        if (error) {
+            alert('Error saving profile');
+        } else {
+            alert('Settings saved successfully!');
         }
     };
+
+    if (loading) return <div className="p-8 text-slate-400">Loading settings...</div>;
 
     return (
         <div className="space-y-6 max-w-2xl animate-in fade-in duration-500">
@@ -69,15 +77,10 @@ export default function SettingsPage() {
                 <p className="text-slate-400">Manage your account and company settings.</p>
             </div>
 
-            {message && (
-                <div className={`p-4 rounded-md mb-4 ${message.includes('successfully') ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                    {message}
-                </div>
-            )}
-
+            {/* Profile Section */}
             <Card className="bg-slate-900 border-slate-800">
                 <CardHeader>
-                    <CardTitle className="text-slate-100">Profile</CardTitle>
+                    <CardTitle>Profile</CardTitle>
                     <CardDescription>Update your personal information.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -85,10 +88,9 @@ export default function SettingsPage() {
                         <Label htmlFor="name">Full Name</Label>
                         <Input
                             id="name"
-                            placeholder="John Doe"
                             value={profile.full_name}
                             onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                            className="bg-slate-950 border-slate-800"
+                            className="bg-slate-950 border-slate-700"
                         />
                     </div>
                     <div className="space-y-2">
@@ -96,22 +98,24 @@ export default function SettingsPage() {
                         <Input
                             id="email"
                             type="email"
-                            value={user?.email || ''}
+                            value={profile.email}
                             disabled
-                            className="bg-slate-950 border-slate-800 opacity-50"
+                            className="bg-slate-950/50 border-slate-800 text-slate-500 cursor-not-allowed"
                         />
                     </div>
                 </CardContent>
                 <CardFooter className="border-t border-slate-800 px-6 py-4">
-                    <Button onClick={handleSave} disabled={loading} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">
-                        {loading ? 'Saving...' : 'Save Changes'}
+                    <Button onClick={handleSave} disabled={saving} className="bg-cyan-600 hover:bg-cyan-500">
+                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Changes
                     </Button>
                 </CardFooter>
             </Card>
 
+            {/* Company Section */}
             <Card className="bg-slate-900 border-slate-800">
                 <CardHeader>
-                    <CardTitle className="text-slate-100">Company Details</CardTitle>
+                    <CardTitle>Company Details</CardTitle>
                     <CardDescription>Manage your company information for invoices.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -119,47 +123,25 @@ export default function SettingsPage() {
                         <Label htmlFor="company">Company Name</Label>
                         <Input
                             id="company"
-                            placeholder="Acme Inc."
                             value={profile.company_name}
                             onChange={(e) => setProfile({ ...profile, company_name: e.target.value })}
-                            className="bg-slate-950 border-slate-800"
+                            className="bg-slate-950 border-slate-700"
                         />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="vat">VAT Number</Label>
                         <Input
                             id="vat"
-                            placeholder="EU123456789"
                             value={profile.vat_number}
                             onChange={(e) => setProfile({ ...profile, vat_number: e.target.value })}
-                            className="bg-slate-950 border-slate-800"
+                            className="bg-slate-950 border-slate-700"
                         />
                     </div>
                 </CardContent>
                 <CardFooter className="border-t border-slate-800 px-6 py-4">
-                    <Button onClick={handleSave} disabled={loading} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">
-                        {loading ? 'Saving...' : 'Save Changes'}
+                    <Button onClick={handleSave} disabled={saving} variant="outline" className="border-slate-700">
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
-                </CardFooter>
-            </Card>
-
-            <Card className="bg-slate-900 border-slate-800 opacity-50">
-                <CardHeader>
-                    <CardTitle className="text-slate-100">Security</CardTitle>
-                    <CardDescription>Change your password (Disabled for Demo).</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="current-password">Current Password</Label>
-                        <Input id="current-password" type="password" disabled className="bg-slate-950 border-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="new-password">New Password</Label>
-                        <Input id="new-password" type="password" disabled className="bg-slate-950 border-slate-800" />
-                    </div>
-                </CardContent>
-                <CardFooter className="border-t border-slate-800 px-6 py-4">
-                    <Button disabled>Update Password</Button>
                 </CardFooter>
             </Card>
         </div>
