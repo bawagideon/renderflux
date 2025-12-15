@@ -1,10 +1,10 @@
+// apps/worker/src/redis.ts
 import IORedis from 'ioredis';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const USE_MOCK_QUEUE = process.env.USE_MOCK_QUEUE === 'true';
 
-export const redis = USE_MOCK_QUEUE ? null : new IORedis(REDIS_URL, {
-    maxRetriesPerRequest: null, // Required for BullMQ
+// FIX: Optimized config for Upstash/Production
+export const connection = new IORedis(REDIS_URL, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false, // Required for serverless Redis
 });
-
-export const connection = redis;
