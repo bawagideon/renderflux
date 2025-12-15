@@ -2,16 +2,23 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { pdfQueue, connection } from './queue';
+import { startWorker } from './worker'; // <--- IMPORT WORKER
 import crypto from 'crypto';
 import archiver from 'archiver';
 import axios from 'axios';
-import { supabase } from './db'; // Ensure this exists
+import { supabase } from './db';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increased for bulk payloads
+// Allow CORS for your frontend
+app.use(cors({ origin: '*' }));
+app.use(express.json({ limit: '50mb' }));
+
+// --- HEALTH CHECK (Fixes UptimeRobot) ---
+app.get('/', (req, res) => {
+    res.status(200).send('✅ RenderFlux API & Worker are Active!');
+});
 
 // --- STANDARD RENDER ---
 app.post('/render', async (req: Request, res: Response) => {
@@ -115,7 +122,6 @@ app.get('/jobs/:id', async (req: Request, res: Response) => {
 // --- BULK PROCESSING (Redis) ---
 app.post('/bulk', async (req: Request, res: Response) => {
     try {
-        // SAFETY CHECK 1: Ensure Redis is connected
         if (!connection) {
             return res.status(500).json({ error: 'Redis connection not available for bulk operations' });
         }
@@ -131,7 +137,6 @@ app.post('/bulk', async (req: Request, res: Response) => {
             data: { ...item, batchId },
         }));
 
-        // Now safe to use connection because of the check above
         await connection.set(`batch:${batchId}:total`, data.length);
         await connection.set(`batch:${batchId}:completed`, 0);
         await connection.del(`batch:${batchId}:urls`);
@@ -148,7 +153,6 @@ app.post('/bulk', async (req: Request, res: Response) => {
 app.get('/batches/:batchId', async (req: Request, res: Response) => {
     const { batchId } = req.params;
     try {
-        // SAFETY CHECK 2
         if (!connection) {
             return res.status(500).json({ error: 'Redis connection not available' });
         }
@@ -182,7 +186,6 @@ app.get('/batches/:batchId', async (req: Request, res: Response) => {
 app.get('/batches/:batchId/zip', async (req: Request, res: Response) => {
     const { batchId } = req.params;
     try {
-        // SAFETY CHECK 3
         if (!connection) {
             return res.status(500).json({ error: 'Redis connection not available' });
         }
@@ -206,14 +209,9 @@ app.get('/batches/:batchId/zip', async (req: Request, res: Response) => {
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="batch-${batchId}.zip"`);
 
-        const archive = archiver('zip', {
-            zlib: { level: 9 },
-        });
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
-        archive.on('error', (err) => {
-            throw err;
-        });
-
+        archive.on('error', (err) => { throw err; });
         archive.pipe(res);
 
         for (let i = 0; i < urls.length; i++) {
@@ -224,7 +222,6 @@ app.get('/batches/:batchId/zip', async (req: Request, res: Response) => {
                 archive.append(response.data, { name: filename });
             } catch (err) {
                 console.error(`Failed to fetch ${url} for zip`, err);
-                // Continue to next file even if one fails
             }
         }
 
@@ -237,6 +234,16 @@ app.get('/batches/:batchId/zip', async (req: Request, res: Response) => {
     }
 });
 
-app.listen(PORT, () => {
+// --- START SERVER & WORKER ---
+app.listen(PORT, async () => {
     console.log(`API running on http://localhost:${PORT}`);
+
+    // START THE WORKER INSIDE THE API
+    try {
+        console.log('🚀 Starting Embedded Worker...');
+        startWorker();
+        console.log('✅ Worker active and listening for jobs');
+    } catch (err) {
+        console.error('❌ Failed to start worker:', err);
+    }
 });
