@@ -1,29 +1,27 @@
 # apps/api/Dockerfile
-# Use Node 20 Alpine (Lighter and faster for API)
-FROM node:20-alpine
+# USE PLAYWRIGHT IMAGE (Has Node + Chrome + Dependencies)
+FROM mcr.microsoft.com/playwright:v1.57.0-jammy
 
 WORKDIR /app
 
-# Install pnpm
+# Install PNPM
 RUN npm install -g pnpm
 
-# Copy root configuration
+# Copy Root Configs
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-
-# Copy shared packages
 COPY packages ./packages
 
-# Copy the API source code
+# Copy API Source
 COPY apps/api ./apps/api
 
-# Install dependencies
+# Install Dependencies (Root + API)
 RUN pnpm install --frozen-lockfile
 
-# Build the API
+# Build API
 RUN pnpm --filter api build
 
-# Expose the API port
+# Expose Port
 EXPOSE 3001
 
-# Start the API server
+# Start the Monolith (API + Worker inside)
 CMD ["node", "apps/api/dist/index.js"]
