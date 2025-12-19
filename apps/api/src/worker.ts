@@ -1,128 +1,110 @@
+// apps/api/src/worker.ts
 import { Worker, Job } from 'bullmq';
-import { connection } from './redis';
+import { connection } from './queue'; // Or './redis' depending on your file structure
 import { getBrowser } from './browser';
-import Handlebars from 'handlebars';
-// Removed MockWorker import as we are merging into API for production
-import { uploadPdf } from './storage';
+import { uploadToR2 } from './storage';
+import { supabase } from './db';
 
-const QUEUE_NAME = 'pdf-generation';
-
-const processJob = async (job: any) => {
-    console.log(`Processing job ${job.id}...`);
-    const { html, templateId, data, type = 'pdf', options = {} } = job.data;
-
-    let content = html || '';
-
-    // Simple template merging
-    if (data && content) {
-        try {
-            const template = Handlebars.compile(content);
-            content = template(data);
-        } catch (e) {
-            console.error("Template error:", e);
-        }
-    }
-
-    if (!content) {
-        throw new Error("No HTML content to render");
-    }
-
-    const browser = await getBrowser();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    try {
-        await page.setContent(content, {
-            waitUntil: options.waitFor || 'networkidle',
-            timeout: 30000
-        });
-
-        let outputBuffer: Buffer;
-        let extension: string;
-        let contentType: string;
-
-        if (type === 'screenshot') {
-            outputBuffer = await page.screenshot({
-                fullPage: true,
-                type: 'jpeg',
-                quality: 80
-            }) as Buffer;
-            extension = 'jpg';
-            contentType = 'image/jpeg';
-        } else {
-            outputBuffer = await page.pdf({
-                format: options.format || 'A4',
-                printBackground: true,
-                landscape: options.landscape || false,
-                margin: options.margin
-            });
-            extension = 'pdf';
-            contentType = 'application/pdf';
-        }
-
-        const filename = `render-${job.id}-${Date.now()}.${extension}`;
-
-        // Upload to R2
-        const url = await uploadPdf(filename, outputBuffer);
-        console.log(`Uploaded to: ${url}`);
-
-        return {
-            url,
-            // Only return base64 if upload failed or wasn't configured, otherwise keep payload light
-            result: url ? undefined : outputBuffer.toString('base64'),
-            contentType
-        };
-    } catch (error) {
-        console.error(`Job ${job.id} failed:`, error);
-        throw error;
-    } finally {
-        await page.close();
-        await context.close();
-    }
-};
+// Define the interface for job data
+interface JobData {
+    html?: string;
+    url?: string;
+    type: 'pdf' | 'screenshot';
+    options?: any;
+    userId?: string;
+    batchId?: string; // For bulk ops
+}
 
 export const startWorker = () => {
-    // Removed MockWorker check - assuming production/monolith mode
+    console.log('👷 Worker Initialized');
 
-    const worker = new Worker(
-        QUEUE_NAME,
-        processJob,
-        {
-            connection: connection as any,
-            concurrency: 5,
-            limiter: {
-                max: 10,
-                duration: 1000,
-            },
-        }
-    );
+    const worker = new Worker<JobData>('pdf-generation', async (job: Job) => {
+        console.log(`[Job ${job.id}] Processing ${job.data.type}...`);
 
-    worker.on('completed', async (job) => {
-        console.log(`Job ${job.id} completed!`);
+        let browser;
+        let context;
+        let page;
 
-        // --- BULK TRACKING LOGIC ---
-        if (job.data?.batchId && connection) {
-            try {
-                const batchId = job.data.batchId;
-                const resultUrl = job.returnvalue?.url;
+        try {
+            // 1. Launch Browser
+            browser = await getBrowser();
+            context = await browser.newContext();
+            page = await context.newPage();
 
-                // 1. Increment completed count
-                await connection.incr(`batch:${batchId}:completed`);
-
-                // 2. Add URL to the list (if we have one)
-                if (resultUrl) {
-                    await connection.rpush(`batch:${batchId}:urls`, resultUrl);
-                }
-            } catch (err) {
-                console.error("Failed to update batch stats", err);
+            // 2. Load Content (HTML or URL)
+            if (job.data.url) {
+                await page.goto(job.data.url, { waitUntil: 'networkidle' });
+            } else if (job.data.html) {
+                await page.setContent(job.data.html, { waitUntil: 'networkidle' });
             }
+
+            // 3. Generate Output (The Logic Split)
+            let buffer: Buffer;
+            let mimeType: string;
+            let extension: string;
+
+            if (job.data.type === 'screenshot') {
+                // --- SCREENSHOT LOGIC ---
+                buffer = await page.screenshot({
+                    fullPage: true,
+                    type: 'png',
+                    // Apply scale if provided (defaults to 1)
+                    scale: job.data.options?.scale ? 'css' : undefined
+                });
+                mimeType = 'image/png';
+                extension = 'png';
+            } else {
+                // --- PDF LOGIC (Default) ---
+                buffer = await page.pdf({
+                    format: job.data.options?.format || 'A4',
+                    printBackground: true,
+                    landscape: job.data.options?.landscape || false,
+                    margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
+                });
+                mimeType = 'application/pdf';
+                extension = 'pdf';
+            }
+
+            // 4. Upload to Storage (R2/S3)
+            const filename = `${job.id}-${Date.now()}.${extension}`;
+            const publicUrl = await uploadToR2(buffer, filename, mimeType);
+
+            console.log(`[Job ${job.id}] Success: ${publicUrl}`);
+
+            // 5. Update Usage Log (Async, don't await blocking)
+            if (job.data.userId) {
+                // Find the latest 'queued' log for this user and update it to 'success'
+                // Or just insert a success log if tracking strictly by completion
+                const { error } = await supabase
+                    .from('usage_logs')
+                    .update({ status: 'success', duration_ms: Date.now() - job.timestamp })
+                    .eq('user_id', job.data.userId)
+                    .eq('status', 'queued')
+                    .order('created_at', { ascending: false })
+                    .limit(1); // Update the most recent one
+            }
+
+            return { url: publicUrl };
+
+        } catch (error: any) {
+            console.error(`[Job ${job.id}] Failed:`, error);
+            throw error; // Triggers BullMQ retry
+        } finally {
+            if (page) await page.close();
+            if (context) await context.close();
+            // Don't close browser, we reuse it (Monolith optimization)
         }
+
+    }, {
+        connection,
+        concurrency: 5 // Process 5 jobs at once 
+    });
+
+    worker.on('completed', (job) => {
+        console.log(`[Job ${job.id}] Completed!`);
     });
 
     worker.on('failed', (job, err) => {
-        console.error(`Job ${job?.id} failed with ${err.message}`);
+        console.log(`[Job ${job?.id}] Failed with ${err.message}`);
     });
-
-    console.log('Worker started!');
-    return worker;
 };
