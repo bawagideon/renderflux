@@ -27,8 +27,11 @@ export function Playground() {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
 
-            // 1. Send Job to API
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/render`, {
+            // 1. Sanitize the API URL (Remove trailing slash if present)
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '';
+
+            // 2. Send Job to API
+            const res = await fetch(`${apiUrl}/render`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -51,10 +54,10 @@ export function Playground() {
 
             const initialData = await res.json();
 
-            // 2. Poll for Completion
+            // 3. Poll for Completion
             const finalUrl = await pollJob(initialData.jobId);
 
-            // 3. SHOW THE RESULT
+            // 4. SHOW THE RESULT
             setResultUrl(finalUrl);
 
         } catch (err: any) {
@@ -65,11 +68,14 @@ export function Playground() {
     };
 
     const pollJob = async (jobId: string) => {
+        // Sanitize URL here too
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '';
+
         const maxRetries = 30; // 60 seconds timeout
         for (let i = 0; i < maxRetries; i++) {
             await new Promise(r => setTimeout(r, 2000)); // Wait 2s
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/jobs/${jobId}`);
+            const res = await fetch(`${apiUrl}/jobs/${jobId}`);
             const data = await res.json();
 
             console.log('Polling Job:', data); // Debugging log
