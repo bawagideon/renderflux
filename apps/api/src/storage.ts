@@ -16,7 +16,12 @@ const s3Client = new S3Client({
     },
 });
 
-export const uploadPdf = async (filename: string, buffer: Buffer): Promise<string> => {
+// RENAMED from uploadPdf -> uploadToR2 to match worker.ts call
+export const uploadToR2 = async (
+    buffer: Buffer,
+    filename: string,
+    mimeType: string = 'application/pdf' // Default to PDF, but allow 'image/png'
+): Promise<string> => {
     if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
         console.warn('R2 credentials missing. Skipping upload.');
         return '';
@@ -27,22 +32,21 @@ export const uploadPdf = async (filename: string, buffer: Buffer): Promise<strin
             Bucket: R2_BUCKET_NAME,
             Key: filename,
             Body: buffer,
-            ContentType: 'application/pdf',
+            ContentType: mimeType, // Use dynamic mime type
         });
 
         await s3Client.send(command);
 
-        // FIX: Use the Public Domain if available (Solving the 400 Bad Request)
+        // Use Public Domain if available
         if (R2_PUBLIC_DOMAIN) {
-            // Ensure no double slashes if the env var has a trailing slash
             const cleanDomain = R2_PUBLIC_DOMAIN.replace(/\/$/, '');
             return `${cleanDomain}/${filename}`;
         }
 
-        // Fallback to the private S3 URL (This usually requires auth headers to view)
+        // Fallback URL
         return `https://${R2_BUCKET_NAME}.${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${filename}`;
     } catch (error) {
-        console.error('Failed to upload PDF to R2:', error);
+        console.error('Failed to upload file to R2:', error);
         throw error;
     }
 };
